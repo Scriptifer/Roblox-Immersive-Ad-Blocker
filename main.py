@@ -53,6 +53,15 @@ if is_roblox_open():
 
 print("Please wait before opening Roblox..")
 rbx_ip = socket.gethostbyname("apis.roblox.com")
+if rbx_ip == "127.0.0.1":
+    print("It looks like last session was not able to cleanup properly, cleaning up now.")
+    subprocess.run(["py", "cleanup.py"])
+    rbx_ip = socket.gethostbyname("apis.roblox.com")
+
+if rbx_ip == "127.0.0.1":
+    print("Cleanup failed")
+    exit(1)
+
 private_key = rsa.generate_private_key(
     public_exponent=65537,
     key_size=2048,
