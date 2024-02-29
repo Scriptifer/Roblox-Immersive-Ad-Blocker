@@ -85,6 +85,10 @@ builder = builder.add_extension(
     critical=False,
 )
 
+builder = builder.add_extension(
+    x509.BasicConstraints(ca=True, path_length=None), critical=True,
+)
+
 certificate = builder.sign(
     private_key=private_key,
     algorithm=hashes.SHA256(),
