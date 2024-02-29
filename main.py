@@ -68,13 +68,13 @@ private_key = rsa.generate_private_key(
     backend=default_backend()
 )
 
-subject = issuer = x509.Name([
-    x509.NameAttribute(NameOID.COMMON_NAME, u'apis.roblox.com')
+subject = x509.Name([
+    x509.NameAttribute(NameOID.COMMON_NAME, u'roblox.com'),
+    x509.NameAttribute(NameOID.ORGANIZATION_NAME, u'Roblox Corporation')
 ])
-
 builder = x509.CertificateBuilder()
 builder = builder.subject_name(subject)
-builder = builder.issuer_name(issuer)
+builder = builder.issuer_name(subject)
 builder = builder.not_valid_before(datetime.datetime.utcnow())
 builder = builder.not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
 
@@ -145,7 +145,7 @@ with open("C:\\Windows\\System32\\drivers\\etc\\hosts", 'r') as f:
         old_hosts = f.read()
 
 with open("C:\\Windows\\System32\\drivers\\etc\\hosts", 'a') as f:
-        f.write("\n127.0.0.1    apis.roblox.com")
+        f.write("\n127.0.0.1    apis.roblox.com\n0.0.0.0    advertise.roblox.com")
 
 def cleanup():
     hosts_path = "C:\\Windows\\System32\\drivers\\etc\\hosts"
