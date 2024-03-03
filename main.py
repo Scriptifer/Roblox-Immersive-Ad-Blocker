@@ -14,6 +14,7 @@ import json
 import ctypes
 import sys
 import psutil
+import atexit
 system = platform.system()
 if system != "Windows":
     print("Only Windows is supported.")
@@ -203,6 +204,7 @@ if __name__ == '__main__':
     context = ('certificate.pem', 'private.key')
     try:
         print("Now you can open Roblox!")
+        atexit.register(cleanup)
         app.run(host='localhost', port=443, ssl_context=context)
     finally:
-        cleanup()
+        print("Cleaning up..")
