@@ -12,6 +12,7 @@ import requests
 import socket
 import json
 import ctypes
+import ssl
 import sys
 import psutil
 import atexit
@@ -22,6 +23,15 @@ if system != "Windows":
     exit(1)
 
 is_open = False
+def get_certificate(hostname, ip_address, port=443):
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    with socket.create_connection((ip_address, port)) as sock:
+        with context.wrap_socket(sock, server_hostname=hostname) as ssock:
+            cert_pem = ssl.DER_cert_to_PEM_cert(ssock.getpeercert(True))
+    return cert_pem
+
 def is_admin():
     try:
         with open("C:\\Program Files\\test.txt", "w") as f:
@@ -53,8 +63,14 @@ if is_roblox_open():
     print("Please run this script before Roblox.")
     exit(1)
 
-print("Please wait before opening Roblox..")
 rbx_ip = socket.gethostbyname("apis.roblox.com")
+connectToAServer = input("Would you like to connect to a Roblox immersive ad blocking server via entering IP address of the server? Note: the server will be able to see your cookies\n").lower().startswith("y")
+if connectToAServer:
+    rbx_ip = input("Please enter the server's ip address: ")
+else:
+    print("Locally hosting server and connecting to it.")
+
+print("Please wait before opening Roblox..")
 if not os.path.exists("games.json"):
     with open("games.json", "w") as f:
         f.write("[]")
@@ -73,54 +89,62 @@ if rbx_ip == "127.0.0.1":
     print("Cleanup failed")
     exit(1)
 
-private_key = rsa.generate_private_key(
-    public_exponent=65537,
-    key_size=2048,
-    backend=default_backend()
-)
-
-subject = x509.Name([
-    x509.NameAttribute(NameOID.COMMON_NAME, u'roblox.com'),
-    x509.NameAttribute(NameOID.ORGANIZATION_NAME, u'Roblox Corporation')
-])
-builder = x509.CertificateBuilder()
-builder = builder.subject_name(subject)
-builder = builder.issuer_name(subject)
-builder = builder.not_valid_before(datetime.datetime.utcnow())
-builder = builder.not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
-
-builder = builder.serial_number(x509.random_serial_number())
-builder = builder.public_key(private_key.public_key())
-builder = builder.add_extension(
-    x509.SubjectAlternativeName([x509.DNSName(u'apis.roblox.com')]),
-    critical=False,
-)
-
-builder = builder.add_extension(
-    x509.BasicConstraints(ca=True, path_length=None), critical=True,
-)
-
-certificate = builder.sign(
-    private_key=private_key,
-    algorithm=hashes.SHA256(),
-    backend=default_backend()
-)
-with open("certificate.pem", "wb") as cert_file:
-    cert_bytes = certificate.public_bytes(serialization.Encoding.PEM)
-    cert_file.write(cert_bytes)
-
-with open("private.key", "wb") as key_file:
-    key_file.write(private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    ))
-
+if not connectToAServer:
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+        backend=default_backend()
+    )
+    
+    subject = x509.Name([
+        x509.NameAttribute(NameOID.COMMON_NAME, u'roblox.com'),
+        x509.NameAttribute(NameOID.ORGANIZATION_NAME, u'Roblox Corporation')
+    ])
+    builder = x509.CertificateBuilder()
+    builder = builder.subject_name(subject)
+    builder = builder.issuer_name(subject)
+    builder = builder.not_valid_before(datetime.datetime.utcnow())
+    builder = builder.not_valid_after(datetime.datetime.utcnow() + datetime.timedelta(days=365))
+    
+    builder = builder.serial_number(x509.random_serial_number())
+    builder = builder.public_key(private_key.public_key())
+    builder = builder.add_extension(
+        x509.SubjectAlternativeName([x509.DNSName(u'apis.roblox.com')]),
+        critical=False,
+    )
+    
+    builder = builder.add_extension(
+        x509.BasicConstraints(ca=True, path_length=None), critical=True,
+    )
+    
+    certificate = builder.sign(
+        private_key=private_key,
+        algorithm=hashes.SHA256(),
+        backend=default_backend()
+    )
+    with open("certificate.pem", "wb") as cert_file:
+        cert_bytes = certificate.public_bytes(serialization.Encoding.PEM)
+        cert_file.write(cert_bytes)
+    
+    with open("private.key", "wb") as key_file:
+        key_file.write(private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        ))
+    
+else:
+    with open("certificate.pem", "wb") as cert_file:
+        cert_bytes = get_certificate("apis.roblox.com", rbx_ip).encode('utf-8')
+        cert_file.write(cert_bytes)
+    
+    
 subprocess.run(["certutil", "-addstore", "Root", "certificate.pem"])
 certSerialNumber = x509.load_pem_x509_certificate(cert_bytes, default_backend()).serial_number
 certSerialNumber = certSerialNumber.to_bytes((certSerialNumber.bit_length() + 7) // 8, 'big').hex()
 with open("certificate.pem", "r") as file:
     pem_certificate = file.read()
+    print(pem_certificate)
 
 appdata_dir = os.path.join(os.getenv('LOCALAPPDATA'), 'Roblox')
 if not os.path.isdir(appdata_dir):
@@ -160,7 +184,11 @@ with open("C:\\Windows\\System32\\drivers\\etc\\hosts", 'r') as f:
         old_hosts = f.read()
 
 with open("C:\\Windows\\System32\\drivers\\etc\\hosts", 'a') as f:
+    if connectToAServer:
+        f.write("\n"+rbx_ip+"    apis.roblox.com\n0.0.0.0    advertise.roblox.com")
+    else:
         f.write("\n127.0.0.1    apis.roblox.com\n0.0.0.0    advertise.roblox.com")
+    
 
 def cleanup():
     hosts_path = "C:\\Windows\\System32\\drivers\\etc\\hosts"
@@ -174,7 +202,9 @@ def cleanup():
 
     subprocess.run(["certutil", "-delstore", "Root", certSerialNumber])
     os.remove("certificate.pem")
-    os.remove("private.key")
+    if not connectToAServer:
+        os.remove("private.key")
+    
     exit(0)
 
 app = Flask(__name__)
@@ -225,7 +255,17 @@ def catch_all(path):
         
     return Response(contentresponse, status=response.status_code, content_type=(response.headers.get('Content-Type') or "text/plain"), headers=response.headers.items())
 
-if __name__ == '__main__':
+if connectToAServer:
+    print("Now you can open Roblox!")
+    atexit.register(cleanup)
+    try:
+        while True:
+            pass
+        
+    finally:
+        print("Cleaning up..")
+    
+if __name__ == '__main__' and not connectToAServer:
     context = ('certificate.pem', 'private.key')
     try:
         print("Now you can open Roblox!")
